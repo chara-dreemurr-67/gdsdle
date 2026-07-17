@@ -1,6 +1,7 @@
 import { ChatInputCommandInteraction, EmbedBuilder, MessageFlags, SlashCommandBuilder, type APIApplicationCommandOption, type ToAPIApplicationCommandOptions } from "discord.js";
 import type { Command } from "../types/Command.js";
 import CommandManager from "../singletons/CommandManager.js";
+import LoadEnv from "../singletons/LoadEnv.js";
 
 export default {
     Command: new SlashCommandBuilder()
@@ -13,7 +14,7 @@ export default {
         });
         const Embed: EmbedBuilder = new EmbedBuilder()
             .setColor(0x00ffff)
-            .setTitle("GDSdle. Can you guess that level 50+ GDS member?")
+            .setTitle(`GDSdle. Can you guess that level ${LoadEnv.MINIMUM_LEVEL_REQUIREMENT}+ GDS member?`)
             .addFields(
                 ...[...CommandManager.Values()].map(Command => {
                     const Options: ToAPIApplicationCommandOptions[] = Command.Command.options;
