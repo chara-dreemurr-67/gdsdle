@@ -31,7 +31,7 @@ export default {
                 })
             )
             .setFooter({ 
-                text: "* = required options, (Administrator Command) = commands only the bot host can run, (Cancelable) = long running commands that can be cancel with /cancel."
+                text: "* = required options, (Administrator Command) = commands only the bot administrators can run, (Cancelable) = long running commands that can be cancel with /cancel."
              })
         ;
         await Interaction.editReply({

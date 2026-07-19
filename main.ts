@@ -15,8 +15,24 @@ Client.once(Events.ClientReady, Client => console.log(`Logged in as ${Client.use
 Client.on(Events.InteractionCreate, async Interaction => {
     if(Interaction.isAutocomplete()) {
         const Command: Command | undefined = CommandManager.Get(Interaction.commandName);
-        if(Command && Command.Autocomplete)
+        if(Command && Command.Autocomplete) {
+            if(Command.Administrator && LoadEnv.ADMINISTRATOR_IDS.includes(Interaction.user.id)) 
+                return;
+            
+            if(!Command.AllowBanned) 
+                return;
             await Command.Autocomplete(Interaction);
+        }
+        return;
+    }
+
+    if(Interaction.isButton()) {
+        const [CommandName] = Interaction.customId.split(":");
+        const Command = CommandManager.Get(CommandName);
+        if(!Command?.Button) 
+            return;
+
+        await Command.Button(Interaction);
         return;
     }
 
@@ -46,7 +62,7 @@ Client.on(Events.InteractionCreate, async Interaction => {
 
     try {
         console.log(`${Interaction.user.id}(${Interaction.user.username}) used ${Interaction.commandName}.`);
-        if(Command.Administrator && Interaction.user.id !== LoadEnv.ADMINISTRATOR_ID) {
+        if(Command.Administrator && LoadEnv.ADMINISTRATOR_IDS.includes(Interaction.user.id)) {
             await Interaction.reply({
                 content: "You are not permitted to use this command.",
                 allowedMentions: { repliedUser: false },
@@ -54,8 +70,17 @@ Client.on(Events.InteractionCreate, async Interaction => {
             });
             return;
         }
+
+        if(!Command.AllowBanned) {
+            await Interaction.reply({
+                content: "You are not allowed to use this command.",
+                allowedMentions: { repliedUser: false },
+                flags: MessageFlags.Ephemeral
+            });
+            return;
+        }
+
         await Command.Action(Interaction, Arg2?.signal);
-        
     }
     catch(Err) {
         console.error(Err);

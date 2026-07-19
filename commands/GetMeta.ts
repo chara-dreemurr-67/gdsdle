@@ -39,7 +39,7 @@ export default {
                 },
                 {
                     name: "Leaderboard Range",
-                    value: `#${Profile.PlacementRage[0]}-#${Profile.PlacementRage[1]}`,
+                    value: `#${Profile.PlacementRange[0]}-#${Profile.PlacementRange[1]}`,
                     inline: true
                 }
             )

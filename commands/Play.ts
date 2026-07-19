@@ -4,6 +4,7 @@ import { FailedReasons } from "../singletons/TodaysGDSdle.js";
 import GameManager from "../singletons/GameManager.js";
 import TodaysGDSdle from "../singletons/TodaysGDSdle.js";
 import LoadEnv from "../singletons/LoadEnv.js";
+import DataManager from "../singletons/DataManager.js";
 
 export default {
     Command: new SlashCommandBuilder()
@@ -54,6 +55,10 @@ export default {
             return;
         }
 
+        const PlayerProfile = DataManager.GetProfile(UserID);
+        if(PlayerProfile.Status) 
+            DataManager.UpdateProfile(UserID, { TotalGames: PlayerProfile.Profile.TotalGames + 1 });
+
         const TodaysMeta = Status.Meta;
         const Today: string = await TodaysGDSdle.TodaysGDSdle;
         const Profile = TodaysMeta[Today];
@@ -73,7 +78,7 @@ export default {
                 },
                 {
                     name: "Leaderboard Range",
-                    value: `#${Profile.PlacementRage[0]}-#${Profile.PlacementRage[1]}`,
+                    value: `#${Profile.PlacementRange[0]}-#${Profile.PlacementRange[1]}`,
                     inline: true
                 }
             )

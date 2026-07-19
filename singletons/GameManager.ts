@@ -1,3 +1,5 @@
+import Database from "../Database.js";
+import DataManager from "./DataManager.js";
 import LoadEnv from "./LoadEnv.js";
 import TodaysGDSdle from "./TodaysGDSdle.js";
 
@@ -12,23 +14,81 @@ export enum Tiles {
 interface GuessResult {
     Progress: Tiles[];
     Correct: boolean;
+    Done: boolean;
 }
 
 interface PlayerInfo {
     Progress: Tiles[][];
     Tries: number;
     Correct: boolean;
+    Done: boolean;
 }
 
-class GM {
-    private readonly PlayerRegistry: Map<string, PlayerInfo> = new Map<string, PlayerInfo>();
+interface PlayerProgressRow {
+    PlayerID: string;
+    Progress: string;
+    Tries: number;
+    Correct: number;
+    Done: number;
+}
 
-    public async GetProgressBoard(PlayerID: string): Promise<string> {
-        // Has been guarded by caller.
-        const Player: PlayerInfo = this.PlayerRegistry.get(PlayerID)!;
-        const ProgressBoard: string[] = Player.Progress.map(Row => Row.join(""));
-        ProgressBoard.push(...new Array<string>(LoadEnv.MAX_TRIES - Player.Progress.length).fill("⬜".repeat((await TodaysGDSdle.TodaysGDSdle).length)));
-        return ProgressBoard.join("\n");
+type PlayerRegistry = Map<string, PlayerInfo>;
+
+class GameManager {
+    private readonly PlayerRegistry: PlayerRegistry;
+    private readonly GetPlayerSTMT = Database.prepare<[string], PlayerProgressRow>(`
+        SELECT * FROM PlayerProgress
+        WHERE PlayerID = ?
+    `);
+    private readonly SavePlayerSTMT = Database.prepare(`
+        INSERT INTO PlayerProgress
+        (PlayerID, Progress, Tries, Correct)
+        Value(?, ?, ?, ?)
+        ON CONFLICT(PlayerID)
+        DO UPDATE SET
+            Progress = excluded.Progress,
+            Tries = excluded.Tries,
+            Correct = excluded.Correct
+            Done = excluded.Done
+    `);
+    private readonly CreatePlayerSTMT = Database.prepare(`
+        INSERT OR REPLACE INTO PlayerProgress
+        (PlayerID, Progress, Tries, Correct, Done)
+        VALUES(?, ?, ?, ?, ?)
+    `);
+
+    public constructor() {
+        this.PlayerRegistry = new Map((Database.prepare("SELECT * FROM PlayerProgress").all() as PlayerProgressRow[])
+            .map(Row => [Row.PlayerID, { Progress: JSON.parse(Row.Progress), Tries: Row.Tries, Correct: !!Row.Correct, Done: !!Row.Done }]))
+        ;
+        TodaysGDSdle.on("newDay", () => this.Clear());
+    }
+
+    public LoadPlayer(PlayerID: string): void {
+        const Row: PlayerProgressRow | undefined = this.GetPlayerSTMT.get(PlayerID);
+
+        if(!Row)
+            return this.New(PlayerID);
+
+        this.PlayerRegistry.set(PlayerID, {
+            Progress: JSON.parse(Row.Progress),
+            Tries: Row.Tries,
+            Correct: !!Row.Correct,
+            Done: !!Row.Done
+        });
+    }
+
+    public SavePlayer(PlayerID: string): void {
+        const Player: PlayerInfo | undefined = this.PlayerRegistry.get(PlayerID);
+        if(!Player)
+            return;
+
+        this.SavePlayerSTMT.run(
+            PlayerID,
+            JSON.stringify(Player.Progress),
+            Player.Tries,
+            Number(Player.Correct)
+        );
     }
 
     public Guess(PlayerID: string, Guess: string, Answer: string): GuessResult {
@@ -56,11 +116,47 @@ class GM {
         }
 
         // Also has been guarded by caller.
-        this.PlayerRegistry.get(PlayerID)!.Progress.push(Progress);
-        this.PlayerRegistry.get(PlayerID)!.Tries += 1;
+        const Player: PlayerInfo = this.PlayerRegistry.get(PlayerID)!;
+        Player.Progress.push(Progress);
+        Player.Tries++;
+        Player.Correct = Guess === Answer;
+        Player.Done = Player.Correct || Player.Tries === LoadEnv.MAX_TRIES;
+        this.SavePlayer(PlayerID);
+
+        const GetResult = DataManager.GetProfile(PlayerID);
+        if(!GetResult.Status) {
+            return {
+                Correct: Guess == Answer,
+                Progress,
+                Done: Player.Done
+            };
+        }
+        const PlayerProfile = GetResult.Profile;
+        let Streak: number = PlayerProfile.Streak;
+        let BestStreak: number = PlayerProfile.BestStreak;
+        let Win: number = PlayerProfile.Win;
+        let Loss: number = PlayerProfile.Loss;
+        let LastPlayed: number = Date.now();
+        
+        if(Player.Done) {
+            Streak = Player.Correct ? PlayerProfile.Streak + 1 : 0;
+            BestStreak = PlayerProfile.BestStreak < Streak ? Streak : PlayerProfile.BestStreak;
+            Win = PlayerProfile.Win + (Player.Correct ? 1 : 0);
+            Loss = PlayerProfile.Loss + (Player.Correct ? 0 : 1);
+        }
+
+        DataManager.UpdateProfile(PlayerID, {
+            Streak,
+            BestStreak,
+            Win,
+            Loss,
+            LastPlayed
+        });
+
         return {
             Correct: Guess == Answer,
-            Progress
+            Progress,
+            Done: Player.Done
         };
     }
 
@@ -69,7 +165,24 @@ class GM {
     }
 
     public Clear(): void {
+        for(const PlayerID in DataManager.GetAll()) {
+            const Result = DataManager.GetProfile(PlayerID);
+            if(!Result.Status)
+                continue;
+
+            const PlayerProfile = Result.Profile;
+            if(!this.PlayerRegistry.has(PlayerID)) {
+                DataManager.UpdateProfile(PlayerID, { Missed: PlayerProfile.Missed + 1 });
+                continue;
+            }
+
+            const TodayProgress = this.PlayerRegistry.get(PlayerID)!;
+            if(!TodayProgress.Done) {
+                DataManager.UpdateProfile(PlayerID, { Incomplete: PlayerProfile.Incomplete + 1 });
+            }
+        }
         this.PlayerRegistry.clear();
+        Database.prepare("DELETE FROM PlayerProgress").run();
     }
 
     public Has(PlayerID: string): boolean {
@@ -77,16 +190,22 @@ class GM {
     }
 
     public New(PlayerID: string): void {
-        this.PlayerRegistry.set(PlayerID, {
+        const Player: PlayerInfo = {
             Progress: [],
             Correct: false,
+            Done: false,
             Tries: 0
-        });
+        };
+
+        this.PlayerRegistry.set(PlayerID, Player);
+        this.CreatePlayerSTMT.run(
+            PlayerID,
+            JSON.stringify(Player.Progress),
+            Player.Tries,
+            Number(Player.Done),
+            Number(Player.Correct)
+        );
     }
 }
 
-const GameManager = new GM();
-
-TodaysGDSdle.on("newDay", () => GameManager.Clear());
-
-export default GameManager;
+export default new GameManager();
