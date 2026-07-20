@@ -16,5 +16,5 @@ export default {
     })(),
     MAX_TRIES: /^\+?\d+$/.test(process.env.MAX_TRIES ?? "") ? Number(process.env.MAX_TRIES) : 6,
     MINIMUM_LEVEL_REQUIREMENT: /^\+?\d+$/.test(process.env.MINIMUM_LEVEL_REQUIREMENT ?? "") ? Number(process.env.MAX_TRIES) : 50,
-    TIMEOUT_DURATION: /^\+?\d+$/.test(process.env.TIMEOUT_DURATION ?? "") ? Number(process.env.TIMEOUT_DURATION) : 604800000
+    TIMEOUT_DURATION: /^\+?\d+$/.test(process.env.TIMEOUT_DURATION ?? "") ? Number(process.env.TIMEOUT_DURATION) : 604800
 };

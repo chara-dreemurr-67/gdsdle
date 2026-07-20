@@ -6,7 +6,7 @@ import DataManager from "../singletons/DataManager.js";
 export default {
     Command: new SlashCommandBuilder()
         .setName("delete")
-        .setDescription(`Delete your GDSdle profile. Note: this will put you in a ${LoadEnv.TIMEOUT_DURATION / 86400000} days timeout.`)
+        .setDescription(`Delete your GDSdle profile. Note: this will put you in a ${LoadEnv.TIMEOUT_DURATION / 86400} days timeout.`)
     ,
     Action: async (Interaction: ChatInputCommandInteraction): Promise<void> => {
         const UserID: string = Interaction.user.id;
@@ -22,18 +22,18 @@ export default {
             .setTitle("Delete Profile")
             .setDescription(
                 "Are you sure you want to delete your GDSdle profile?\n\n" +
-                `This action cannot be undone and will place you in a ${LoadEnv.TIMEOUT_DURATION / 86400000} day timeout.`
+                `This action cannot be undone and will place you in a ${LoadEnv.TIMEOUT_DURATION / 86400} days timeout.`
             )
             .setColor(0xff0000)
         ;
         const Row: ActionRowBuilder<ButtonBuilder> = new ActionRowBuilder<ButtonBuilder>().addComponents(
             new ButtonBuilder()
-                .setCustomId(`Delete:Confirm:${UserID}`)
+                .setCustomId(`delete:Confirm:${UserID}`)
                 .setLabel("Delete Profile")
                 .setStyle(ButtonStyle.Danger)
             ,
             new ButtonBuilder()
-                .setCustomId(`Delete:Cancel:${UserID}`)
+                .setCustomId(`delete:Cancel:${UserID}`)
                 .setLabel("Cancel")
                 .setStyle(ButtonStyle.Secondary)
             ,
@@ -47,16 +47,20 @@ export default {
     Button: async (Interaction: ButtonInteraction): Promise<void> => {
         const UserID: string = Interaction.user.id;
         switch(Interaction.customId) {
-            case `Delete:Confirm:${UserID}`:
+            case `delete:Confirm:${UserID}`:
                 await Interaction.update({
-                    content: "Your profile has been deleted."
+                    content: "Your profile has been deleted.",
+                    embeds: [],
+                    components: []
                 });
-
+                DataManager.RemoveProfile(UserID);
                 break;
             
             case `Delete:Cancel:${UserID}`:
                 await Interaction.update({
-                    content: "Profile deletion cancelled."
+                    content: "Profile deletion cancelled.",
+                    embeds: [],
+                    components: []
                 });
                 break;
         }

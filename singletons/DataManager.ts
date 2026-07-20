@@ -9,6 +9,24 @@ export enum CreateFailedReasons {
     PlayerAlreadyExist
 }
 
+interface Data {
+    [Name: string]: {
+        Value: any;
+        Name: string;
+        Transformer: (Value: Data[string]["Value"]) => string;
+    }
+}
+
+interface GetProfileTransform {
+    Status: true;
+    Profile: Data;
+}
+
+type GetProfileTransformResult = 
+    | QueryFailed
+    | GetProfileTransform
+;
+
 interface PlayerData {
     Streak: number;
     BestStreak: number;
@@ -111,7 +129,7 @@ class DataManager {
     private readonly TimeoutZone: TimeoutZone;
     private readonly TheShadowRealm: TSR;
     private readonly BanSTMT = Database.prepare(`
-        INSERT OF REPLACE INTO TheShadowRealm
+        INSERT INTO TheShadowRealm
         (PlayerID, By, Reason)
         VALUES(?, ?, ?)
     `);
@@ -120,24 +138,22 @@ class DataManager {
     private readonly DeleteProfileSTMT = Database.transaction((PlayerID: string, Timeout: number): void => {
         Database.prepare("DELETE FROM PlayerProgress WHERE PlayerID = ?").run(PlayerID);
         Database.prepare(`
-            INSERT OR REPLACE INTO TimeoutZone
+            INSERT INTO TimeoutZone
             (PlayerID, Timeout)
             VALUES(?, ?)
         `).run(PlayerID, Timeout);
     });
     private readonly CreateProfileSTMT = Database.prepare(`
-        INSERT OR REPLACE INTO PlayerProgress
+        INSERT INTO PlayerData
         (PlayerID, CreatedAt)
         VALUES(?, ?)
     `);
     // I wrote a script just to generate this btw
     private readonly ModifyProfileSTMT = Database.prepare(`
-        INSERT OR REPLACE INTO PlayerProgress
-        (PlayerID, Streak, BestStreak, TotalGames, Win, Missed, Incomplete, Loss, LastPlayed)
-        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(PlayerID)
-        DO UPDATE SET
-            PlayerID = excluded.PlayerID,
+        INSERT INTO PlayerData
+        (PlayerID, Streak, BestStreak, TotalGames, Win, Missed, Incomplete, Loss, LastPlayed, CreatedAt)
+        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(PlayerID) DO UPDATE SET
             Streak = excluded.Streak,
             BestStreak = excluded.BestStreak,
             TotalGames = excluded.TotalGames,
@@ -145,7 +161,8 @@ class DataManager {
             Missed = excluded.Missed,
             Incomplete = excluded.Incomplete,
             Loss = excluded.Loss,
-            LastPlayed = excluded.LastPlayed
+            LastPlayed = excluded.LastPlayed,
+            CreatedAt = excluded.CreatedAt
     `);
 
     public constructor() {
@@ -203,9 +220,13 @@ class DataManager {
         return { Status: true };
     }
 
+    public IsBanned(PlayerID: string): boolean {
+        return this.TheShadowRealm.has(PlayerID);
+    }
+
     public GetAll(): Map<string, PlayerData> {
         return this.Players;
-    } 
+    }
 
     public GetProfile(PlayerID: string): QueryResult {
         const Player: PlayerData | undefined = this.Players.get(PlayerID);
@@ -219,6 +240,83 @@ class DataManager {
         return {
             Status: true,
             Profile: Player
+        };
+    }
+
+    public GetProfileTransform(PlayerID: string): GetProfileTransformResult {
+        const Player: QueryResult = this.GetProfile(PlayerID);
+        if(!Player.Status)
+            return Player;
+
+        const Profile: PlayerData = Player.Profile;
+        /** 
+            interface PlayerData {
+                Streak: number;
+                BestStreak: number;
+                TotalGames: number;
+                Win: number;
+                Missed: number;
+                Incomplete: number;
+                Loss: number;
+                get Winrate(): number;
+                LastPlayed: number | null;
+                CreatedAt: number;
+            }
+        */
+        return {
+            Status: true,
+            Profile: {
+                Streak: {
+                    Value: Profile.Streak,
+                    Name: "Streak",
+                    Transformer: (Value: number): string => String(Value)
+                },
+                BestStreak: {
+                    Value: Profile.BestStreak,
+                    Name: "Best Streak",
+                    Transformer: (Value: number): string => String(Value)
+                },
+                TotalGames: {
+                    Value: Profile.TotalGames,
+                    Name: "Total Games",
+                    Transformer: (Value: number): string => String(Value)
+                },
+                Win: {
+                    Value: Profile.Win,
+                    Name: "Win",
+                    Transformer: (Value: number): string => String(Value)
+                },
+                Missed: {
+                    Value: Profile.Missed,
+                    Name: "Missed",
+                    Transformer: (Value: number): string => String(Value)
+                },
+                Incomplete: {
+                    Value: Profile.Incomplete,
+                    Name: "Incomplete",
+                    Transformer: (Value: number): string => String(Value)
+                },
+                Loss: {
+                    Value: Profile.Loss,
+                    Name: "Loss",
+                    Transformer: (Value: number): string => String(Value)
+                },
+                Winrate: {
+                    Value: Profile.Winrate,
+                    Name: "Winrate",
+                    Transformer: (Value: number): string => Number.isNaN(Profile.Winrate) ? "No games played." : String(Value)
+                },
+                LastPlayed: {
+                    Value: Profile.LastPlayed,
+                    Name: "Last Played",
+                    Transformer: (Value: number): string => Value === null ? "No games played." : new Date(Value).toDateString()
+                },
+                CreatedAt: {
+                    Value: Profile.CreatedAt,
+                    Name: "Total Games",
+                    Transformer: (Value: number): string => new Date(Value).toDateString()
+                },
+            }
         };
     }
 
@@ -289,6 +387,7 @@ class DataManager {
             Player.LastPlayed,
             Player.CreatedAt
         );
+
         return { Status: true };
     }
 
@@ -300,7 +399,7 @@ class DataManager {
                 Reason: QueryFailedReasons.PlayerNotFound
             }
         }
-        const Timeout: number = Date.now() + LoadEnv.TIMEOUT_DURATION;
+        const Timeout: number = Date.now() + LoadEnv.TIMEOUT_DURATION * 1000;
         this.Players.delete(PlayerID);
         this.TimeoutZone.set(PlayerID, Timeout);
         this.DeleteProfileSTMT(PlayerID, Timeout);

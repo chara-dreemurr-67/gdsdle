@@ -4,8 +4,8 @@ import DataManager from "../singletons/DataManager.js";
 
 export default {
     Command: new SlashCommandBuilder()
-        .setName("ping")
-        .setDescription("Check if the bot is alive or not.")
+        .setName("profile")
+        .setDescription("Get the profile of a user.")
         .addUserOption(Option =>
             Option
                 .setName("who")
@@ -15,7 +15,7 @@ export default {
     ,
     Action: async (Interaction: ChatInputCommandInteraction): Promise<void> => { 
         const User: User = Interaction.options.getUser("who", false) ?? Interaction.user;
-        const Profile = DataManager.GetProfile(User.id);
+        const Profile = DataManager.GetProfileTransform(User.id);
         if(!Profile.Status) {
             await Interaction.reply({
                 content: `User ${User.username} doesn't have a GDSdle profile.`,
@@ -35,9 +35,9 @@ export default {
             .setThumbnail(User.displayAvatarURL({ size: 512 }))
             .setTitle(`${User.username}'s lifetime statistic`)
             .addFields(
-                ...Object.entries(Profile.Profile).map(([Key, Value]) => ({
-                    name: Key,
-                    value: Value,
+                ...Object.values(Profile.Profile).map(Profile => ({
+                    name: Profile.Name,
+                    value: Profile.Transformer(Profile.Value),
                     inline: true
                 }))
             )

@@ -42,17 +42,16 @@ class GameManager {
     `);
     private readonly SavePlayerSTMT = Database.prepare(`
         INSERT INTO PlayerProgress
-        (PlayerID, Progress, Tries, Correct)
-        Value(?, ?, ?, ?)
-        ON CONFLICT(PlayerID)
-        DO UPDATE SET
+        (PlayerID, Progress, Tries, Correct, Done)
+        VALUES(?, ?, ?, ?, ?)
+        ON CONFLICT(PlayerID) DO UPDATE SET
             Progress = excluded.Progress,
             Tries = excluded.Tries,
-            Correct = excluded.Correct
+            Correct = excluded.Correct,
             Done = excluded.Done
     `);
     private readonly CreatePlayerSTMT = Database.prepare(`
-        INSERT OR REPLACE INTO PlayerProgress
+        INSERT INTO PlayerProgress
         (PlayerID, Progress, Tries, Correct, Done)
         VALUES(?, ?, ?, ?, ?)
     `);
@@ -87,7 +86,8 @@ class GameManager {
             PlayerID,
             JSON.stringify(Player.Progress),
             Player.Tries,
-            Number(Player.Correct)
+            Number(Player.Correct),
+            Number(Player.Done)
         );
     }
 

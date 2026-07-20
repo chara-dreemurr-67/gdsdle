@@ -14,8 +14,17 @@ export default {
     Action: async (Interaction: ChatInputCommandInteraction): Promise<void> => {
         const UserID: string = Interaction.user.id;
 
+        if(!DataManager.HasProfile(UserID)) {
+            await Interaction.reply({
+                content: "You need a profile to play, use /create to create a profile.",
+                allowedMentions: { repliedUser: false },
+                flags: MessageFlags.Ephemeral
+            });
+            return;
+        }
+
         if(GameManager.Has(UserID)) {
-            if(GameManager.Get(UserID)!.Progress.length === LoadEnv.MAX_TRIES) {
+            if(GameManager.Get(UserID)!.Done) {
                 await Interaction.reply({
                     content: "You have finished today's game of GDSdle! Use /getresult to see today's GDSdle result.",
                     allowedMentions: { repliedUser: false },

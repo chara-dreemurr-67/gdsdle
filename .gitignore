@@ -4,3 +4,4 @@ node_modules
 script.js
 public/
 cached/
+*.db*

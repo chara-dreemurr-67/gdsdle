@@ -1,25 +1,42 @@
 import { Client as C, GatewayIntentBits, Events, MessageFlags } from "discord.js";
 import type { Command } from "./types/Command.js";
 import CommandManager from "./singletons/CommandManager.js";
+import DataManager  from "./singletons/DataManager.js";
 import LoadEnv from "./singletons/LoadEnv.js";
+import Database from "./Database.js";
 
 await CommandManager.LoadCommands();
 
 const Client: C = new C({
     intents: [
         GatewayIntentBits.Guilds,
+        GatewayIntentBits.DirectMessages
     ]
 });
+
+const Signals: string[] = [
+    "SIGTERM",
+    "SIGINT",
+    "uncaughtException",
+    "unhandledRejection"
+];
+
+for(const Signal of Signals) {
+    process.on(Signal, async () => {
+        Database.close();
+        await Client.destroy();
+    });
+}
 
 Client.once(Events.ClientReady, Client => console.log(`Logged in as ${Client.user.tag}`));
 Client.on(Events.InteractionCreate, async Interaction => {
     if(Interaction.isAutocomplete()) {
         const Command: Command | undefined = CommandManager.Get(Interaction.commandName);
         if(Command && Command.Autocomplete) {
-            if(Command.Administrator && LoadEnv.ADMINISTRATOR_IDS.includes(Interaction.user.id)) 
+            if(Command.Administrator && !LoadEnv.ADMINISTRATOR_IDS.includes(Interaction.user.id)) 
                 return;
             
-            if(!Command.AllowBanned) 
+            if(!Command.AllowBanned && DataManager.IsBanned(Interaction.user.id)) 
                 return;
             await Command.Autocomplete(Interaction);
         }
@@ -62,7 +79,7 @@ Client.on(Events.InteractionCreate, async Interaction => {
 
     try {
         console.log(`${Interaction.user.id}(${Interaction.user.username}) used ${Interaction.commandName}.`);
-        if(Command.Administrator && LoadEnv.ADMINISTRATOR_IDS.includes(Interaction.user.id)) {
+        if(Command.Administrator && !LoadEnv.ADMINISTRATOR_IDS.includes(Interaction.user.id)) {
             await Interaction.reply({
                 content: "You are not permitted to use this command.",
                 allowedMentions: { repliedUser: false },
@@ -71,7 +88,7 @@ Client.on(Events.InteractionCreate, async Interaction => {
             return;
         }
 
-        if(!Command.AllowBanned) {
+        if(!Command.AllowBanned && DataManager.IsBanned(Interaction.user.id)) {
             await Interaction.reply({
                 content: "You are not allowed to use this command.",
                 allowedMentions: { repliedUser: false },

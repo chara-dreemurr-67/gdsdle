@@ -22,7 +22,7 @@ export default {
         const Now: number = Date.now();
         if(Timeout.Status && Now < Timeout.Timeout) {
             await Interaction.reply({
-                content: `You're in timeout, you can create a profile again <t:${Timeout.Timeout - Now}:R>.`,
+                content: `You're in timeout, you can create a profile again <t:${Math.floor(Timeout.Timeout / 1000)}:R>.`,
                 allowedMentions: { repliedUser: false },
                 flags: MessageFlags.Ephemeral
             });

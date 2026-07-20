@@ -62,7 +62,7 @@ class TodaysGDSdle extends EventEmitter {
         INSERT INTO CachedWordList
         (ID, Timestamp, WordList)
         VALUES(1, ?, ?)
-        ON CONFLICT(ID) 
+        ON CONFLICT(ID) DO UPDATE SET
             Timestamp = excluded.Timestamp,
             WordList = excluded.WordList
     `);
@@ -70,8 +70,7 @@ class TodaysGDSdle extends EventEmitter {
         INSERT INTO CachedMeta
         (Username, PlacementRange, Role)
         VALUES(?, ?, ?)
-        ON CONFLICT(Username)
-        DO UPDATE SET
+        ON CONFLICT(Username) DO UPDATE SET
             PlacementRange = excluded.PlacementRange,
             Role = excluded.Role
     `); 
@@ -106,7 +105,7 @@ class TodaysGDSdle extends EventEmitter {
         const CachedRow = Database.prepare("SELECT * FROM CachedWordList WHERE ID = 1").get() as CacheWordListRow | undefined;
         const MetaRows = Database.prepare("SELECT * FROM CachedMeta").all() as CacheMetaRow[];
 
-        if(CachedRow && MetaRows.length) {
+        if(CachedRow?.Wordlist && MetaRows.length) {
             const WordList: WordList = {
                 Timestamp: CachedRow.Timestamp,
                 WordList: JSON.parse(CachedRow.Wordlist)

@@ -1,6 +1,7 @@
 import { ChatInputCommandInteraction, MessageFlags, SlashCommandBuilder, User } from "discord.js";
 import type { Command } from "../types/Command.js";
 import DataManager from "../singletons/DataManager.js";
+import LoadEnv from "../singletons/LoadEnv.js";
 
 export default {
     Command: new SlashCommandBuilder()
@@ -21,6 +22,16 @@ export default {
     ,
     Action: async (Interaction: ChatInputCommandInteraction): Promise<void> => { 
         const User: User = Interaction.options.getUser("who", true);
+
+        if(LoadEnv.ADMINISTRATOR_IDS.includes(User.id)) {
+            await Interaction.reply({
+                content: "You cannot ban this user.",
+                allowedMentions: { repliedUser: false },
+                flags: MessageFlags.Ephemeral
+            });
+            return;
+        }
+
         const Reason: string = Interaction.options.getString("reason", false) ?? "No reason given.";
         const Ban = DataManager.Ban(User.id, Interaction.user.id, Reason);
         if(!Ban.Status) {
