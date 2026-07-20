@@ -42,7 +42,9 @@ Database.exec(`
     );
 
     CREATE TABLE IF NOT EXISTS TheShadowRealm(
-        PlayerID TEXT PRIMARY KEY
+        PlayerID TEXT PRIMARY KEY,
+        By TEXT PRIMARY KEY,
+        Reason TEXT PRIMARY KEY
     );
 `);
 

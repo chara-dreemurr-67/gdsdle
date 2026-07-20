@@ -33,7 +33,7 @@ interface UpdateArgument {
     LastPlayed?: number | null;
 }
 
-interface DBPlayerDataRow extends PlayerData {
+interface PlayerDataRow extends PlayerData {
     PlayerID: string;
 }
 
@@ -46,6 +46,14 @@ type QueryTSRResult =
     | QueryTSRSucceeded
     | QueryFailed
 ;
+
+type TSR = Map<string, { By: string; Reason: string; }>;
+
+interface TSRRow {
+    PlayerID: string;
+    By: string;
+    Reason: string;
+}
 
 type DeleteResult = UpdateResult;
 type UnbanResult = UpdateResult;
@@ -91,7 +99,7 @@ type QueryResult =
 
 type Player = Map<string, PlayerData>;
 
-interface DBTimeoutZone {
+interface TimeoutZoneRow {
     PlayerID: string;
     Timeout: number;
 }
@@ -101,8 +109,12 @@ type TimeoutZone = Map<string, number>;
 class DataManager {
     private readonly Players: Player;
     private readonly TimeoutZone: TimeoutZone;
-    private readonly TheShadowRealm: string[];
-    private readonly BanSTMT = Database.prepare("INSERT OF REPLACE INTO TheShadowRealm(PlayerID) VALUES(?)");
+    private readonly TheShadowRealm: TSR;
+    private readonly BanSTMT = Database.prepare(`
+        INSERT OF REPLACE INTO TheShadowRealm
+        (PlayerID, By, Reason)
+        VALUES(?, ?, ?)
+    `);
     private readonly UnbanSTMT = Database.prepare("DELETE FROM TheShadowRealm WHERE PlayerID = ?");
     private readonly RemoveTimeoutSTMT = Database.prepare("DELETE FROM TimeoutZone WHERE PlayerID = ?");
     private readonly DeleteProfileSTMT = Database.transaction((PlayerID: string, Timeout: number): void => {
@@ -138,7 +150,7 @@ class DataManager {
 
     public constructor() {
         this.Players = new Map<string, PlayerData>(
-            (Database.prepare("SELECT * FROM PlayerData").all() as DBPlayerDataRow[]).map(Row =>
+            (Database.prepare("SELECT * FROM PlayerData").all() as PlayerDataRow[]).map(Row =>
                 [
                     Row.PlayerID,
                     {
@@ -159,35 +171,35 @@ class DataManager {
             )
         );
         this.TimeoutZone = new Map<string, number>(
-            (Database.prepare("SELECT * FROM TimeoutZone").all() as DBTimeoutZone[]).map(Row => [Row.PlayerID, Row.Timeout])
+            (Database.prepare("SELECT * FROM TimeoutZone").all() as TimeoutZoneRow[]).map(Row => [Row.PlayerID, Row.Timeout])
         );
-        this.TheShadowRealm = (Database.prepare("SELECT * FROM TheShadowRealm").all() as { PlayerID: string }[])
-            .map(Player => Player.PlayerID)
+        this.TheShadowRealm = new Map((Database.prepare("SELECT * FROM TheShadowRealm").all() as TSRRow[])
+            .map(Player => [Player.PlayerID, { By: Player.By, Reason: Player.Reason }]))
         ;
     }
 
     public Unban(PlayerID: string): UnbanResult {
-        if(!this.TheShadowRealm.includes(PlayerID)) {
+        if(!this.TheShadowRealm.has(PlayerID)) {
             return {
                 Status: false,
                 Reason: QueryFailedReasons.PlayerNotFound
             };
         }
 
-        this.TheShadowRealm.splice(0, this.TheShadowRealm.length, ...this.TheShadowRealm.filter(ID => ID === PlayerID));
+        this.TheShadowRealm.delete(PlayerID);
         this.UnbanSTMT.run(PlayerID);
         return { Status: true };
     }
 
-    public Ban(PlayerID: string): BanResult {
-        if(this.TheShadowRealm.includes(PlayerID)) {
+    public Ban(PlayerID: string, By: string, Reason: string): BanResult {
+        if(this.TheShadowRealm.has(PlayerID)) {
             return {
                 Status: false,
                 Reason: CreateFailedReasons.PlayerAlreadyExist
             };
         }
-        this.TheShadowRealm.push(PlayerID);
-        this.BanSTMT.run(PlayerID);
+        this.TheShadowRealm.set(PlayerID, { By, Reason });
+        this.BanSTMT.run(PlayerID, By, Reason);
         return { Status: true };
     }
 
@@ -216,11 +228,6 @@ class DataManager {
                 Status: false,
                 Reason: CreateFailedReasons.PlayerAlreadyExist
             };
-        }
-
-        if(this.TimeoutZone.has(PlayerID)) {
-            this.TimeoutZone.delete(PlayerID);
-            this.RemoveTimeoutSTMT.run(PlayerID);
         }
 
         const CreatedAt: number = Date.now();

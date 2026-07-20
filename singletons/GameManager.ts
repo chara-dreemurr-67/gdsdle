@@ -190,21 +190,13 @@ class GameManager {
     }
 
     public New(PlayerID: string): void {
-        const Player: PlayerInfo = {
+        this.PlayerRegistry.set(PlayerID, {
             Progress: [],
             Correct: false,
             Done: false,
             Tries: 0
-        };
-
-        this.PlayerRegistry.set(PlayerID, Player);
-        this.CreatePlayerSTMT.run(
-            PlayerID,
-            JSON.stringify(Player.Progress),
-            Player.Tries,
-            Number(Player.Done),
-            Number(Player.Correct)
-        );
+        });
+        this.CreatePlayerSTMT.run(PlayerID, "[]", 0, 0, 0);
     }
 }
 
