@@ -37,7 +37,7 @@ interface Failed {
 interface CacheWordListRow {
     ID: number;
     Timestamp: number;
-    Wordlist: string;
+    WordList: string;
 }
 
 interface CacheMetaRow {
@@ -105,10 +105,10 @@ class TodaysGDSdle extends EventEmitter {
         const CachedRow = Database.prepare("SELECT * FROM CachedWordList WHERE ID = 1").get() as CacheWordListRow | undefined;
         const MetaRows = Database.prepare("SELECT * FROM CachedMeta").all() as CacheMetaRow[];
 
-        if(CachedRow?.Wordlist && MetaRows.length) {
+        if(CachedRow?.WordList && MetaRows.length) {
             const WordList: WordList = {
                 Timestamp: CachedRow.Timestamp,
-                WordList: JSON.parse(CachedRow.Wordlist)
+                WordList: JSON.parse(CachedRow.WordList)
             };
 
             const Meta: UserMeta = Object.fromEntries(
