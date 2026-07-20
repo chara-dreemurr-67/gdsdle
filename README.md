@@ -1,14 +1,14 @@
 # gdsdle
 Can you guess that level 50+ GDS member?
 
+## Attribution
+Shoutout to [GDjkhp](https://github.com/GDjkhp)'s and his [message](https://discord.com/channels/398627612299362304/1373749191842463847/1527191201189593239).
+
 ## Build Instructions
 ### Prerequisites
 1. [Git](https://git-scm.com/). (why are you even on github without git)
 2. [Node.js](https://nodejs.org/en/download). (and also npm but that should come with node, i think)
 3. A [Discord](https://discord.com/developers/applications/) bot token.
-
-## Attribution
-Shoutout to [GDjkhp](https://github.com/GDjkhp)'s and his [message](https://discord.com/channels/398627612299362304/1373749191842463847/1527191201189593239).
 
 ### Build
 1. Install dependencies:
